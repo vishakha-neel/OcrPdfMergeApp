@@ -1,128 +1,115 @@
 package com.ocr.OcrPdfMergeApp.service;
 
+import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.pdfbox.multipdf.PDFMergerUtility;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
-import org.apache.pdfbox.rendering.PDFRenderer;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import java.awt.image.BufferedImage;
-import net.sourceforge.tess4j.ITesseract;
-import net.sourceforge.tess4j.Tesseract;
-import net.sourceforge.tess4j.TesseractException;
 
 @Service
 public class PdfService {
 
-     public File processAndMergePdfs(List<MultipartFile> files) throws IOException, TesseractException {
-        List<File> ocrPdfFiles = new ArrayList<>();
-        System.out.println("------ocrPdfFiles ------");
-
-        for (MultipartFile file : files) {
-            System.out.println("------For Loop -- ------");
-
-            File ocrPdf = convertScannedPdfToSearchablePdf(file);
-            ocrPdfFiles.add(ocrPdf);
+    // private static final String INPUT_DIR = BASE_DIR + File.separator + "input";
+    // private static final String OUTPUT_DIR = BASE_DIR + File.separator + "output";
+    
+    public String processPdfs(List<MultipartFile> pdfFiles) {
+        if (pdfFiles.isEmpty()) {
+            return "No PDFs selected.";
         }
 
-        return mergePdfs(ocrPdfFiles);
+        File inputDir = new File("E:\\OCR-Pdfs\\input");
+        File outputDir = new File("E:\\OCR-Pdfs\\output");
+    
+        if (!inputDir.exists()) inputDir.mkdirs();
+        if (!outputDir.exists()) outputDir.mkdirs();
+
+        String os = System.getProperty("os.name").toLowerCase();
+        boolean isWindows = os.contains("win");
+
+        List<String> processedPdfs = new ArrayList<>();
+
+        for (MultipartFile file : pdfFiles) {
+            try {
+                File inputPdf = new File(inputDir, file.getOriginalFilename());
+                System.out.println("File saved to: " + inputPdf.getAbsolutePath());
+                file.transferTo(inputPdf); 
+
+                File outputPdf = new File(outputDir, "OCR_" + file.getOriginalFilename());
+
+                String inputPath = inputPdf.getAbsolutePath().replace("\\", "/").replace("E:", "/mnt/e");
+                String outputPath = outputPdf.getAbsolutePath().replace("\\", "/").replace("E:", "/mnt/e");
+
+                String command = isWindows ?
+                    "wsl ocrmypdf --force-ocr " + inputPath + " " + outputPath :
+                    "ocrmypdf --force-ocr " + inputPdf.getAbsolutePath() + " " + outputPdf.getAbsolutePath();
+
+                System.out.println("Command : " + command);
+
+                Process process = Runtime.getRuntime().exec(command);  
+
+                // ✅ Capture the output and errors
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    System.out.println("OCR Output: " + line);
+                }
+                while ((line = errorReader.readLine()) != null) {
+                    System.out.println("OCR Error: " + line);
+                }
+
+                int exitCode = process.waitFor();
+                System.out.println("OCR Process exited with code: " + exitCode);
+
+                if (exitCode == 0) {
+                    processedPdfs.add(outputPdf.getAbsolutePath());
+                } else {
+                    return "Error processing PDF: " + file.getOriginalFilename();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                return "Error processing PDFs.";
+            }
+        }
+
+        String dateTimeStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        String mergedPdfPath = outputDir + File.separator + "pdf_all_" + dateTimeStr + ".pdf";
+        mergePdfs(processedPdfs, mergedPdfPath);
+
+        return "OCR completed. Merged PDF: " + mergedPdfPath;
     }
 
-    private File convertScannedPdfToSearchablePdf(MultipartFile file) throws IOException, TesseractException {
-        System.out.println("------OCR Process Started------");
+    public void mergePdfs(List<String> pdfPaths, String outputPath) {
+        try {
 
-        if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("Uploaded file is empty or not provided.");
-        }
-
-        String tessDataPath = "C:/Program Files/Tesseract-OCR/tessdata";
-        File tessDataFile = new File(tessDataPath + "/eng.traineddata");
-
-        if (!tessDataFile.exists()) {
-            throw new FileNotFoundException("eng.traineddata not found in " + tessDataPath);
-        }
-
-        File tempOcrPdf = File.createTempFile("ocr_", ".pdf");
-
-        try (PDDocument document = PDDocument.load(file.getInputStream());
-            PDDocument searchablePdf = new PDDocument()) {
-
-            if (document.getNumberOfPages() == 0) {
-                throw new IllegalArgumentException("Uploaded PDF has no pages.");
-            }
-
-            PDFRenderer pdfRenderer = new PDFRenderer(document);
-            ITesseract tesseract = new Tesseract();
-            tesseract.setDatapath(tessDataPath);
-            tesseract.setLanguage("eng");
-
-            for (int i = 0; i < document.getNumberOfPages(); i++) {
-                BufferedImage image = pdfRenderer.renderImageWithDPI(i, 300);
-                if (image == null) {
-                    System.out.println("Skipping null image for page " + i);
-                    continue;
+            PDFMergerUtility merger = new PDFMergerUtility();
+            merger.setDestinationFileName(outputPath);
+            
+            for (String pdfPath : pdfPaths) {
+                File pdfFile = new File(pdfPath);
+                if (pdfFile.exists()) {
+                    merger.addSource(pdfFile);
+                } else {
+                    System.out.println("File not found: " + pdfPath);
                 }
+            }            
 
-                String ocrText = tesseract.doOCR(image);
-                ocrText = ocrText.replace("ﬂ", "fl").replace("ﬁ", "fi"); // Handle ligatures
-
-                if (ocrText.isBlank()) {
-                    System.out.println("No OCR text found for page " + i);
-                    continue;
-                }
-
-                PDPage page = new PDPage();
-                searchablePdf.addPage(page);
-
-                try (PDPageContentStream contentStream = new PDPageContentStream(searchablePdf, page)) {
-                    contentStream.setFont(PDType1Font.HELVETICA, 12);
-                    contentStream.beginText();
-                    contentStream.newLineAtOffset(25, 750);
-
-                    String[] lines = ocrText.split("\n");
-                    for (String line : lines) {
-                        try {
-                            contentStream.showText(line);
-                            contentStream.newLineAtOffset(0, -15);
-                        } catch (IllegalArgumentException e) {
-                            System.out.println("Skipping unsupported text on page " + i + ": " + line);
-                        }
-                    }
-
-                    contentStream.endText();
-                }
-            }
-
-            searchablePdf.save(tempOcrPdf);
+            merger.mergeDocuments(null);
+            
+            System.out.println("PDFs merged successfully to: " + outputPath);
+            
+        } catch (IOException e) {
+            System.err.println("Error merging PDFs: " + e.getMessage());
         }
-
-        System.out.println("------OCR Process Completed------");
-        return tempOcrPdf;
     }
 
-    private File mergePdfs(List<File> pdfFiles) throws IOException {
-        PDFMergerUtility merger = new PDFMergerUtility();
-        System.out.println("------ merger ------");
-        File mergedFile = File.createTempFile("merged_", ".pdf");
-        
-        System.out.println("------ mergedFile ------");
-
-        for (File pdfFile : pdfFiles) {
-            merger.addSource(pdfFile);
-        }
-
-        merger.setDestinationFileName(mergedFile.getAbsolutePath());
-        merger.mergeDocuments(null);
-
-        System.out.println("------ Mergedc successfully ------");
-        return mergedFile;
-    }    
 }

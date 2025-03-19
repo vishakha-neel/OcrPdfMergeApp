@@ -57,14 +57,13 @@
 			<version>2.0.29</version>
 		</dependency>
 
-		<!-- Tess4J for OCR -->
-		<!-- <dependency>
-			<groupId>net.sourceforge.tess4j</groupId>
-			<artifactId>tess4j</artifactId>
-			<version>5.4.0</version>
-		</dependency> -->
-
 		<dependency>
+			<groupId>org.imgscalr</groupId>
+			<artifactId>imgscalr-lib</artifactId>
+			<version>4.2</version>
+		</dependency>
+		<dependency>
+		
 			<groupId>net.sourceforge.tess4j</groupId>
 			<artifactId>tess4j</artifactId>
 			<version>5.7.0</version> <!-- or the latest version -->
