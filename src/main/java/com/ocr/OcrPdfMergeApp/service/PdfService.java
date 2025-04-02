@@ -15,6 +15,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,6 +42,8 @@ public class PdfService
     // private static final String OUTPUT_DIR = BASE_DIR + File.separator + "output";
 
     private static final Pattern FILE_PATTERN = Pattern.compile("OCR_(\\d{1,2})-(\\d{1,2})-(\\d{4})-(\\w+)-(\\d{4})\\.pdf");
+    // private static final Pattern FILE_PATTERN_2 = Pattern.compile("OCR_(\\d{1,2})-(\\d{1,2})-(\\d{4})-(\\w+)-(\\d{4})\\.pdf");
+    private static final Pattern FILE_PATTERN_2 = Pattern.compile("(\\d{8})-(\\w+)-(\\d{2})\\.pdf");
     private final ExecutorService executorService = Executors.newFixedThreadPool(10);
     private final ConcurrentHashMap<String, Integer> dateFileCount = new ConcurrentHashMap<>();
     
@@ -68,8 +71,8 @@ public class PdfService
 
                 File outputPdf = new File(outputDir, "OCR_" + file.getOriginalFilename());
 
-                String inputPath = inputPdf.getAbsolutePath().replace("\\", "/").replace("D:", "/mnt/d");
-                String outputPath = outputPdf.getAbsolutePath().replace("\\", "/").replace("D:", "/mnt/d");
+                String inputPath = inputPdf.getAbsolutePath().replace("\\", "/").replace("E:", "/mnt/e");
+                String outputPath = outputPdf.getAbsolutePath().replace("\\", "/").replace("E:", "/mnt/e");
 
                 String command = isWindows ?
                     "wsl ocrmypdf --force-ocr " + inputPath + " " + outputPath :
@@ -115,7 +118,7 @@ public class PdfService
             return "No PDFs selected.";
         }
     
-        File inputDir = new File(destinationPath+File.pathSeparator+"input");
+        File inputDir = new File(destinationPath+File.separator+"input");
         
         String msg=isValidDirectory(destinationPath);
 
@@ -133,8 +136,10 @@ public class PdfService
     
         String os = System.getProperty("os.name").toLowerCase();
         boolean isWindows = os.contains("win");
+
     
         List<String> processedPdfs = new ArrayList<>();
+        Pattern pattern = Pattern.compile("^(\\d{1,2})(\\d{1,2})(\\d{4})-KOL-(\\d{2,4})");
     
         for (MultipartFile file : pdfFiles) {
             try {
@@ -142,17 +147,36 @@ public class PdfService
                 System.out.println("File saved to: " + inputPdf.getAbsolutePath());
                 file.transferTo(inputPdf);
     
-                File outputPdf = new File(outputDir, "OCR_" + file.getOriginalFilename());
+                String originalFileName = file.getOriginalFilename();
+                Matcher matcher = pattern.matcher(originalFileName);
+                String formattedFileName = originalFileName;
+
+                if (matcher.find()) {
+                    String day = String.format("%02d", Integer.parseInt(matcher.group(1))); // Ensure 2-digit day
+                    String year = matcher.group(3);
+                    String seriesCode = matcher.group(4);
+                    seriesCode = seriesCode.length() > 2 ? seriesCode.substring(seriesCode.length() - 2) : seriesCode;
+                    formattedFileName = String.format("%s03%s-KOL-%s.pdf", day, year, seriesCode);
+                }
+
+
+                File outputPdf = new File(outputDir, formattedFileName);
+                // File outputPdf = new File(outputDir,file.getOriginalFilename());
     
-                String inputPath = inputPdf.getAbsolutePath().replace("\\", "/").replace("D:", "/mnt/d");
-                String outputPath = outputPdf.getAbsolutePath().replace("\\", "/").replace("D:", "/mnt/d");
+                String inputPath = inputPdf.getAbsolutePath().replace("\\", "/").replace("E:", "/mnt/e");
+                String outputPath = outputPdf.getAbsolutePath().replace("\\", "/").replace("E:", "/mnt/e");
     
                 // Define the command as an array
                 String[] command;
                 if (isWindows) {
+                    // command = new String[] {
+                    //     "wsl", "bash", "-c",
+                    //     "/snap/bin/ocrmypdf --force-ocr " + inputPath + " " + outputPath
+                    // };
                     command = new String[] {
-                        "wsl", "bash", "-c",
-                        "/snap/bin/ocrmypdf --force-ocr " + inputPath + " " + outputPath
+                        "wsl", "bash", "-c", 
+                        
+                        "ocrmypdf --force-ocr " + inputPath + " " + outputPath
                     };
                 } else {
                     command = new String[] {
@@ -225,61 +249,209 @@ public class PdfService
         } 
     }
     
-    public String mergePdfs(List<MultipartFile> files, String destinationPath) throws Exception {
+    // public String mergePdfs(List<MultipartFile> files, String destinationPath) throws Exception {
 
-        PDFMergerUtility pdfMerger = new PDFMergerUtility();
-        String msg=isValidDirectory(destinationPath);
+    //     PDFMergerUtility pdfMerger = new PDFMergerUtility();
+    //     String msg=isValidDirectory(destinationPath);
         
-        if(!"Correct".equals(msg))
-        {
-        	return "Incorrect Destination Path ?? "+msg;
+    //     if(!"Correct".equals(msg))
+    //     {
+    //     	return "Incorrect Destination Path ?? "+msg;
+    //     }
+        
+    //     // Ensure the directory exists
+    //     File directory = new File(destinationPath);
+    //     if (!directory.exists()) {
+    //         directory.mkdirs();
+    //     }
+
+    //     // Create a unique output file name
+    //     String outputFileName = "merged_" + System.currentTimeMillis() + ".pdf";
+    //     String outputFilePath = destinationPath + File.separator + outputFileName;
+
+    //     List<File> tempFiles = new ArrayList<>();
+
+    //     try {
+    //         // Convert MultipartFiles to temporary files and add to the merger
+    //         for (MultipartFile file : files) {
+    //             File tempFile = File.createTempFile("temp_", ".pdf");
+    //             tempFiles.add(tempFile);
+
+    //             // Copy content to the temporary file
+    //             try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+    //                 fos.write(file.getBytes());
+    //             }
+
+    //             // Add the temporary file to the merger
+    //             pdfMerger.addSource(tempFile);
+    //         }
+
+    //         // Merge and save the final PDF
+    //         try (FileOutputStream outputStream = new FileOutputStream(outputFilePath)) {
+    //             pdfMerger.setDestinationStream(outputStream);
+    //             pdfMerger.mergeDocuments(null);
+    //         }
+
+    //         return "Merge Pdf Save at: "+outputFilePath;
+
+    //     } finally {
+    //         // Clean up temporary files
+    //         for (File tempFile : tempFiles) {
+    //             if (tempFile.exists()) {
+    //                 tempFile.delete();
+    //             }
+    //         }
+    //     }
+    // }
+
+    // public String mergePdfs(List<MultipartFile> files, String destinationPath) throws Exception {
+    //     String msg = isValidDirectory(destinationPath);
+    //     if (!"Correct".equals(msg)) {
+    //         return "Incorrect Destination Path ?? " + msg;
+    //     }
+    
+    //     // Ensure the directory exists
+    //     File directory = new File(destinationPath);
+    //     if (!directory.exists()) {
+    //         directory.mkdirs();
+    //     }
+    
+    //     // Group files by extracted date key, filtering out null keys
+    //     Map<String, List<MultipartFile>> groupedFiles = files.stream()
+    //         .collect(Collectors.groupingBy(file -> {
+    //             String key = extractDateKey(file.getOriginalFilename(),"merge");
+    //             System.out.println(key);
+    //             return key != null ? key : "unknown"; // Handle null keys properly
+    //         }));
+        
+    //     List<String> mergedFilePaths = new ArrayList<>();
+    
+    //     for (Map.Entry<String, List<MultipartFile>> entry : groupedFiles.entrySet()) {
+    //         String dateKey = entry.getKey();
+    //         List<MultipartFile> pdfFiles = entry.getValue();
+    
+    //         if (pdfFiles.isEmpty() || "unknown".equals(dateKey)) {
+    //             continue;
+    //         }
+    
+    //         int fileCount = pdfFiles.size(); // Total number of PDFs for this date
+    //         String outputFileName = dateKey + "-all-" + String.format("%02d", fileCount) + ".pdf";
+    //         String outputFilePath = destinationPath + File.separator + outputFileName;
+    
+    //         PDFMergerUtility pdfMerger = new PDFMergerUtility();
+    //         List<File> tempFiles = new ArrayList<>();
+    
+    //         try {
+    //             // Convert MultipartFiles to temporary files and add to the merger
+    //             for (MultipartFile file : pdfFiles) {
+    //                 File tempFile = File.createTempFile("temp_", ".pdf");
+    //                 tempFiles.add(tempFile);
+    
+    //                 // Copy content to the temporary file
+    //                 try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+    //                     fos.write(file.getBytes());
+    //                 }
+    
+    //                 // Add the temporary file to the merger
+    //                 pdfMerger.addSource(tempFile);
+    //             }
+    
+    //             // Merge and save the final PDF
+    //             try (FileOutputStream outputStream = new FileOutputStream(outputFilePath)) {
+    //                 pdfMerger.setDestinationStream(outputStream);
+    //                 pdfMerger.mergeDocuments(null);
+    //             }
+    
+    //             mergedFilePaths.add(outputFilePath);
+    
+    //         } finally {
+    //             // Clean up temporary files
+    //             for (File tempFile : tempFiles) {
+    //                 if (tempFile.exists()) {
+    //                     tempFile.delete();
+    //                 }
+    //             }
+    //         }
+    //     }
+    
+    //     return mergedFilePaths.isEmpty() ? "No files merged." : "Merged PDFs saved at: " + String.join(", ", mergedFilePaths);
+    // }
+    public String mergePdfs(List<MultipartFile> files, String destinationPath) throws Exception {
+        String msg = isValidDirectory(destinationPath);
+        if (!"Correct".equals(msg)) {
+            return "Incorrect Destination Path ?? " + msg;
         }
-        
-        // Ensure the directory exists
+    
         File directory = new File(destinationPath);
         if (!directory.exists()) {
             directory.mkdirs();
         }
-
-        // Create a unique output file name
-        String outputFileName = "merged_" + System.currentTimeMillis() + ".pdf";
-        String outputFilePath = destinationPath + File.separator + outputFileName;
-
-        List<File> tempFiles = new ArrayList<>();
-
-        try {
-            // Convert MultipartFiles to temporary files and add to the merger
-            for (MultipartFile file : files) {
-                File tempFile = File.createTempFile("temp_", ".pdf");
-                tempFiles.add(tempFile);
-
-                // Copy content to the temporary file
-                try (FileOutputStream fos = new FileOutputStream(tempFile)) {
-                    fos.write(file.getBytes());
+    
+        Map<String, List<MultipartFile>> groupedFiles = files.stream()
+            .collect(Collectors.groupingBy(file -> {
+                String key = extractDateKey(file.getOriginalFilename(), "merge");
+                System.out.println(key);
+                return key != null ? key : "unknown";
+            }));
+    
+        List<String> mergedFilePaths = new ArrayList<>();
+        List<String> errorFiles = new ArrayList<>();
+    
+        for (Map.Entry<String, List<MultipartFile>> entry : groupedFiles.entrySet()) {
+            String dateKey = entry.getKey();
+            List<MultipartFile> pdfFiles = entry.getValue();
+    
+            if (pdfFiles.isEmpty() || "unknown".equals(dateKey)) {
+                continue;
+            }
+    
+            int fileCount = pdfFiles.size();
+            String outputFileName = dateKey + "-all-" + String.format("%02d", fileCount) + ".pdf";
+            String outputFilePath = destinationPath + File.separator + outputFileName;
+    
+            PDFMergerUtility pdfMerger = new PDFMergerUtility();
+            List<File> tempFiles = new ArrayList<>();
+    
+            try {
+                for (MultipartFile file : pdfFiles) {
+                    File tempFile = File.createTempFile("temp_", ".pdf");
+                    tempFiles.add(tempFile);
+    
+                    try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                        fos.write(file.getBytes());
+                    }
+    
+                    try {
+                        pdfMerger.addSource(tempFile);
+                    } catch (Exception e) {
+                        errorFiles.add(file.getOriginalFilename());
+                        System.err.println("Error adding file: " + file.getOriginalFilename() + " - " + e.getMessage());
+                    }
                 }
-
-                // Add the temporary file to the merger
-                pdfMerger.addSource(tempFile);
-            }
-
-            // Merge and save the final PDF
-            try (FileOutputStream outputStream = new FileOutputStream(outputFilePath)) {
-                pdfMerger.setDestinationStream(outputStream);
-                pdfMerger.mergeDocuments(null);
-            }
-
-            return "Merge Pdf Save at: "+outputFilePath;
-
-        } finally {
-            // Clean up temporary files
-            for (File tempFile : tempFiles) {
-                if (tempFile.exists()) {
-                    tempFile.delete();
+    
+                try (FileOutputStream outputStream = new FileOutputStream(outputFilePath)) {
+                    pdfMerger.setDestinationStream(outputStream);
+                    pdfMerger.mergeDocuments(null);
+                }
+    
+                mergedFilePaths.add(outputFilePath);
+            } catch (Exception e) {
+                System.err.println("Error merging PDFs: " + e.getMessage());
+            } finally {
+                for (File tempFile : tempFiles) {
+                    if (tempFile.exists()) {
+                        tempFile.delete();
+                    }
                 }
             }
         }
-    }
     
+        if (!errorFiles.isEmpty()) {
+            return "Error merging PDFs. Problematic files: " + String.join(", ", errorFiles);
+        }
+    
+        return mergedFilePaths.isEmpty() ? "No files merged." : "Merged PDFs saved at: " + String.join(", ", mergedFilePaths);
+    }
     public String isValidDirectory(String destinationPath) 
     {
         if (destinationPath == null || destinationPath.trim().isEmpty()) 
@@ -325,7 +497,7 @@ public class PdfService
             return null;
         }
 
-        String dateKey = extractDateKey(originalFilename);
+        String dateKey = extractDateKey(originalFilename,"process");
         if (dateKey == null) {
             return null;
         }
@@ -339,15 +511,41 @@ public class PdfService
         return null;
     }
 
-    private String extractDateKey(String originalFilename) {
-        Matcher matcher = FILE_PATTERN.matcher(originalFilename);
-        if (matcher.matches()) {
-            String day = String.format("%02d", Integer.parseInt(matcher.group(1)));
-            String month = String.format("%02d", Integer.parseInt(matcher.group(2)));
-            String year = matcher.group(3);
-            String location = matcher.group(4);
-            return day + month + year + "-" + location;
-        }
+    private String extractDateKey(String originalFilename,String variance) {
+    	
+    	if(variance.equalsIgnoreCase("merge"))
+    	{
+            Matcher matcher = FILE_PATTERN_2.matcher(originalFilename);
+            if (matcher.matches()) 
+            {
+                // String day = String.format("%02d", Integer.parseInt(matcher.group(1)));
+                // String month = String.format("%02d", Integer.parseInt(matcher.group(2)));
+                // String year = matcher.group(3);
+                // String location = matcher.group(4);
+                // return day + month + year + "-" + "KOL";
+//                return day + month + year + "-" + location;
+            // now location is specifiv to KOLKATA - KOL
+
+
+
+            // --------------------------
+            String date = String.format("%02d", Integer.parseInt(matcher.group(1)));
+            return date + "-" + "KOL";
+            }	
+    	}
+    	else
+    	{
+            Matcher matcher = FILE_PATTERN.matcher(originalFilename);
+            if (matcher.matches()) 
+            {
+                String day = String.format("%02d", Integer.parseInt(matcher.group(1)));
+                String month = String.format("%02d", Integer.parseInt(matcher.group(2)));
+                String year = matcher.group(3);
+                String location = matcher.group(4);
+                return day + month + year + "-" + location;
+            // now location is specifiv to KOLKATA - KOL
+            }	
+    	}
         return null;
     }
 
@@ -358,7 +556,10 @@ public class PdfService
             String month = String.format("%02d", Integer.parseInt(matcher.group(2)));
             String year = matcher.group(3);
             String location = matcher.group(4);
-            return day + month + year + "-" + location + "-" + String.format("%02d", sequence) + ".pdf";
+
+            // return day + month + year + "-" + location + "-" + String.format("%02d", sequence) + ".pdf";
+            return day + month + year + "-" + "KOL" + "-" + String.format("%02d", sequence) + ".pdf";
+            // here we change the Location to the 'KOL'
         }
         return null;
     }

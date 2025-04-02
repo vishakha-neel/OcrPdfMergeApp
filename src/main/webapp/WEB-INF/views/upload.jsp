@@ -43,6 +43,10 @@
                 document.getElementById('processBtn').disabled = false;
                 document.getElementById('processBtn').innerHTML = 'Process PDFs';
             });
+            
+            // setTimeout(()=>{
+            // 	location.reload();
+            // },1000);
         }
 
         // Function to merge PDFs with destination path
@@ -90,6 +94,10 @@
                 document.getElementById('mergeBtn').disabled = false;
                 document.getElementById('mergeBtn').innerHTML = 'Merge PDFs';
             });
+            
+            // setTimeout(()=>{
+            // 	location.reload();
+            // },1000);
         }
 
         // Function to Rename PDFs with destination path
@@ -137,6 +145,10 @@
                 document.getElementById('renameBtn').disabled = false;
                 document.getElementById('renameBtn').innerHTML = 'Rename PDFs';
             });
+            
+            // setTimeout(()=>{
+            // 	location.reload();
+            // },1000);
         }
     </script>
 
@@ -206,12 +218,12 @@ label {
 				for="renamePdfFiles" class="form-label">Select PDF Files For
 				Rename </label> <input type="file" id="renamePdfFiles"
 				class="form-control mb-3" multiple accept="application/pdf" />
-			<button id="renameBtn" class="btn btn-primary w-100"
+			<button id="renameBtn" class="btn btn-warning w-100"
 				onclick="submitForm2()">Rename PDFs</button>
 		</div>
     </div>
 	<script
-		src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
+		src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js">
+	</script>
 </body>
 </html>
