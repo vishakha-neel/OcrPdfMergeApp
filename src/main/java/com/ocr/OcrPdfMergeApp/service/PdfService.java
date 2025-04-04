@@ -24,6 +24,7 @@ import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.Comparator;
 
 import org.apache.pdfbox.multipdf.PDFMergerUtility;
 import org.springframework.http.ResponseEntity;
@@ -44,6 +45,9 @@ public class PdfService
     private static final Pattern FILE_PATTERN = Pattern.compile("OCR_(\\d{1,2})-(\\d{1,2})-(\\d{4})-(\\w+)-(\\d{4})\\.pdf");
     // private static final Pattern FILE_PATTERN_2 = Pattern.compile("OCR_(\\d{1,2})-(\\d{1,2})-(\\d{4})-(\\w+)-(\\d{4})\\.pdf");
     private static final Pattern FILE_PATTERN_2 = Pattern.compile("(\\d{8})-(\\w+)-(\\d{2})\\.pdf");
+    private static final Pattern FILE_PATTERN_3 = Pattern.compile("(\\d{8})-KOL-(\\d+|J\\d+)\\.pdf$");
+
+
     private final ExecutorService executorService = Executors.newFixedThreadPool(10);
     private final ConcurrentHashMap<String, Integer> dateFileCount = new ConcurrentHashMap<>();
     
@@ -152,11 +156,12 @@ public class PdfService
                 String formattedFileName = originalFileName;
 
                 if (matcher.find()) {
-                    String day = String.format("%02d", Integer.parseInt(matcher.group(1))); // Ensure 2-digit day
+                    String day = String.format("%02d", Integer.parseInt(matcher.group(1)));    // 2-digit day
+                    String month = String.format("%02d", Integer.parseInt(matcher.group(2)));  // 2-digit month from input
                     String year = matcher.group(3);
                     String seriesCode = matcher.group(4);
-                    seriesCode = seriesCode.length() > 2 ? seriesCode.substring(seriesCode.length() - 2) : seriesCode;
-                    formattedFileName = String.format("%s03%s-KOL-%s.pdf", day, year, seriesCode);
+                    seriesCode = String.format("%02d", Integer.parseInt(seriesCode)); 
+                    formattedFileName = String.format("%s%s%s-KOL-%s.pdf", day, month, year, seriesCode);
                 }
 
 
@@ -250,81 +255,25 @@ public class PdfService
     }
     
     // public String mergePdfs(List<MultipartFile> files, String destinationPath) throws Exception {
-
-    //     PDFMergerUtility pdfMerger = new PDFMergerUtility();
-    //     String msg=isValidDirectory(destinationPath);
-        
-    //     if(!"Correct".equals(msg))
-    //     {
-    //     	return "Incorrect Destination Path ?? "+msg;
-    //     }
-        
-    //     // Ensure the directory exists
-    //     File directory = new File(destinationPath);
-    //     if (!directory.exists()) {
-    //         directory.mkdirs();
-    //     }
-
-    //     // Create a unique output file name
-    //     String outputFileName = "merged_" + System.currentTimeMillis() + ".pdf";
-    //     String outputFilePath = destinationPath + File.separator + outputFileName;
-
-    //     List<File> tempFiles = new ArrayList<>();
-
-    //     try {
-    //         // Convert MultipartFiles to temporary files and add to the merger
-    //         for (MultipartFile file : files) {
-    //             File tempFile = File.createTempFile("temp_", ".pdf");
-    //             tempFiles.add(tempFile);
-
-    //             // Copy content to the temporary file
-    //             try (FileOutputStream fos = new FileOutputStream(tempFile)) {
-    //                 fos.write(file.getBytes());
-    //             }
-
-    //             // Add the temporary file to the merger
-    //             pdfMerger.addSource(tempFile);
-    //         }
-
-    //         // Merge and save the final PDF
-    //         try (FileOutputStream outputStream = new FileOutputStream(outputFilePath)) {
-    //             pdfMerger.setDestinationStream(outputStream);
-    //             pdfMerger.mergeDocuments(null);
-    //         }
-
-    //         return "Merge Pdf Save at: "+outputFilePath;
-
-    //     } finally {
-    //         // Clean up temporary files
-    //         for (File tempFile : tempFiles) {
-    //             if (tempFile.exists()) {
-    //                 tempFile.delete();
-    //             }
-    //         }
-    //     }
-    // }
-
-    // public String mergePdfs(List<MultipartFile> files, String destinationPath) throws Exception {
     //     String msg = isValidDirectory(destinationPath);
     //     if (!"Correct".equals(msg)) {
     //         return "Incorrect Destination Path ?? " + msg;
     //     }
     
-    //     // Ensure the directory exists
     //     File directory = new File(destinationPath);
     //     if (!directory.exists()) {
     //         directory.mkdirs();
     //     }
     
-    //     // Group files by extracted date key, filtering out null keys
     //     Map<String, List<MultipartFile>> groupedFiles = files.stream()
     //         .collect(Collectors.groupingBy(file -> {
-    //             String key = extractDateKey(file.getOriginalFilename(),"merge");
+    //             String key = extractDateKey(file.getOriginalFilename(), "merge");
     //             System.out.println(key);
-    //             return key != null ? key : "unknown"; // Handle null keys properly
+    //             return key != null ? key : "unknown";
     //         }));
-        
+    
     //     List<String> mergedFilePaths = new ArrayList<>();
+    //     List<String> errorFiles = new ArrayList<>();
     
     //     for (Map.Entry<String, List<MultipartFile>> entry : groupedFiles.entrySet()) {
     //         String dateKey = entry.getKey();
@@ -334,7 +283,7 @@ public class PdfService
     //             continue;
     //         }
     
-    //         int fileCount = pdfFiles.size(); // Total number of PDFs for this date
+    //         int fileCount = pdfFiles.size();
     //         String outputFileName = dateKey + "-all-" + String.format("%02d", fileCount) + ".pdf";
     //         String outputFilePath = destinationPath + File.separator + outputFileName;
     
@@ -342,30 +291,31 @@ public class PdfService
     //         List<File> tempFiles = new ArrayList<>();
     
     //         try {
-    //             // Convert MultipartFiles to temporary files and add to the merger
     //             for (MultipartFile file : pdfFiles) {
     //                 File tempFile = File.createTempFile("temp_", ".pdf");
     //                 tempFiles.add(tempFile);
     
-    //                 // Copy content to the temporary file
     //                 try (FileOutputStream fos = new FileOutputStream(tempFile)) {
     //                     fos.write(file.getBytes());
     //                 }
     
-    //                 // Add the temporary file to the merger
-    //                 pdfMerger.addSource(tempFile);
+    //                 try {
+    //                     pdfMerger.addSource(tempFile);
+    //                 } catch (Exception e) {
+    //                     errorFiles.add(file.getOriginalFilename());
+    //                     System.err.println("Error adding file: " + file.getOriginalFilename() + " - " + e.getMessage());
+    //                 }
     //             }
     
-    //             // Merge and save the final PDF
     //             try (FileOutputStream outputStream = new FileOutputStream(outputFilePath)) {
     //                 pdfMerger.setDestinationStream(outputStream);
     //                 pdfMerger.mergeDocuments(null);
     //             }
     
     //             mergedFilePaths.add(outputFilePath);
-    
+    //         } catch (Exception e) {
+    //             System.err.println("Error merging PDFs: " + e.getMessage());
     //         } finally {
-    //             // Clean up temporary files
     //             for (File tempFile : tempFiles) {
     //                 if (tempFile.exists()) {
     //                     tempFile.delete();
@@ -374,94 +324,96 @@ public class PdfService
     //         }
     //     }
     
+    //     if (!errorFiles.isEmpty()) {
+    //         return "Error merging PDFs. Problematic files: " + String.join(", ", errorFiles);
+    //     }
+    
     //     return mergedFilePaths.isEmpty() ? "No files merged." : "Merged PDFs saved at: " + String.join(", ", mergedFilePaths);
     // }
     public String mergePdfs(List<MultipartFile> files, String destinationPath) throws Exception {
         String msg = isValidDirectory(destinationPath);
         if (!"Correct".equals(msg)) {
-            return "Incorrect Destination Path ?? " + msg;
+            return "Incorrect Destination Path: " + msg;
         }
-    
+
         File directory = new File(destinationPath);
         if (!directory.exists()) {
             directory.mkdirs();
         }
-    
+
+        // Group files by DATE (first 8 characters)
+
         Map<String, List<MultipartFile>> groupedFiles = files.stream()
-            .collect(Collectors.groupingBy(file -> {
-                String key = extractDateKey(file.getOriginalFilename(), "merge");
-                System.out.println(key);
-                return key != null ? key : "unknown";
-            }));
-    
+        .collect(Collectors.groupingBy(file -> {
+            String key = extractDateKey(file.getOriginalFilename(), "merge");
+            System.out.println(key);
+            return key != null ? key : "unknown";
+        }));
         List<String> mergedFilePaths = new ArrayList<>();
         List<String> errorFiles = new ArrayList<>();
-    
+
         for (Map.Entry<String, List<MultipartFile>> entry : groupedFiles.entrySet()) {
             String dateKey = entry.getKey();
             List<MultipartFile> pdfFiles = entry.getValue();
-    
-            if (pdfFiles.isEmpty() || "unknown".equals(dateKey)) {
+
+            if (pdfFiles.isEmpty()) {
                 continue;
             }
-    
+
+            // Sort PDFs based on custom logic
+            pdfFiles.sort(Comparator.comparing(file -> extractCustomOrderKey(file.getOriginalFilename())));
+
             int fileCount = pdfFiles.size();
-            String outputFileName = dateKey + "-all-" + String.format("%02d", fileCount) + ".pdf";
+            String outputFileName = dateKey + "-KOL-all-" + String.format("%02d", fileCount) + ".pdf";
             String outputFilePath = destinationPath + File.separator + outputFileName;
-    
+
             PDFMergerUtility pdfMerger = new PDFMergerUtility();
             List<File> tempFiles = new ArrayList<>();
-    
+
             try {
                 for (MultipartFile file : pdfFiles) {
                     File tempFile = File.createTempFile("temp_", ".pdf");
                     tempFiles.add(tempFile);
-    
+
                     try (FileOutputStream fos = new FileOutputStream(tempFile)) {
                         fos.write(file.getBytes());
                     }
-    
+
                     try {
                         pdfMerger.addSource(tempFile);
                     } catch (Exception e) {
                         errorFiles.add(file.getOriginalFilename());
-                        System.err.println("Error adding file: " + file.getOriginalFilename() + " - " + e.getMessage());
                     }
                 }
-    
+
                 try (FileOutputStream outputStream = new FileOutputStream(outputFilePath)) {
                     pdfMerger.setDestinationStream(outputStream);
                     pdfMerger.mergeDocuments(null);
                 }
-    
+
                 mergedFilePaths.add(outputFilePath);
             } catch (Exception e) {
                 System.err.println("Error merging PDFs: " + e.getMessage());
             } finally {
                 for (File tempFile : tempFiles) {
-                    if (tempFile.exists()) {
-                        tempFile.delete();
-                    }
+                    tempFile.delete();
                 }
             }
         }
-    
+
         if (!errorFiles.isEmpty()) {
             return "Error merging PDFs. Problematic files: " + String.join(", ", errorFiles);
         }
-    
+
         return mergedFilePaths.isEmpty() ? "No files merged." : "Merged PDFs saved at: " + String.join(", ", mergedFilePaths);
     }
-    public String isValidDirectory(String destinationPath) 
-    {
-        if (destinationPath == null || destinationPath.trim().isEmpty()) 
-        {
+
+    public String isValidDirectory(String destinationPath) {
+        if (destinationPath == null || destinationPath.trim().isEmpty()) {
             return "Invalid path: Path is null or empty.";
         }
 
         File directory = new File(destinationPath);
-
-        // Check if the path exists and is a directory
         if (!directory.exists()) {
             return "Directory does not exist.";
         }
@@ -470,7 +422,6 @@ public class PdfService
             return "Path is not a directory.";
         }
 
-        // Check write permissions
         if (!directory.canWrite()) {
             return "No write permissions for the directory.";
         }
@@ -497,7 +448,7 @@ public class PdfService
             return null;
         }
 
-        String dateKey = extractDateKey(originalFilename,"process");
+        String dateKey = extractDateKey2(originalFilename);
         if (dateKey == null) {
             return null;
         }
@@ -509,6 +460,35 @@ public class PdfService
             return newFilename;
         }
         return null;
+    }
+    private String extractDateKey2(String originalFilename) {
+        Matcher matcher = FILE_PATTERN.matcher(originalFilename);
+        if (matcher.matches()) {
+            return matcher.group(1);  // Extracts the 8-digit date
+        }
+        return null;
+    }
+
+    private static String extractCustomOrderKey(String filename) {
+        Matcher matcher = FILE_PATTERN_3.matcher(filename);
+
+        if (matcher.find()) {
+            String serial = matcher.group(2);
+
+            if (serial.startsWith("J")) {
+                return "2-" + String.format("%03d", Integer.parseInt(serial.substring(1))); // 'J' series
+            } else {
+                int num = Integer.parseInt(serial);
+                if (num <= 30) {
+                    return "1-" + String.format("%03d", num); // 01-30 first
+                } else if (num >= 51) {
+                    return "3-" + String.format("%03d", num); // 51+ last
+                } else {
+                    return "1-" + String.format("%03d", num); // Default numeric sort
+                }
+            }
+        }
+        return "4-999"; // If pattern doesn't match
     }
 
     private String extractDateKey(String originalFilename,String variance) {
